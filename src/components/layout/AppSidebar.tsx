@@ -58,7 +58,7 @@ export function AppSidebar() {
               exit={{ opacity: 0, x: -10 }}
               className="text-lg font-bold text-sidebar-foreground tracking-tight"
             >
-              Zalestorm
+              Globalesync
             </motion.span>
           )}
         </div>
