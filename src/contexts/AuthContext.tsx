@@ -48,14 +48,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName: string, companyName: string) => {
     const redirectUrl = `${window.location.origin}/`;
-    
-    // First create the company
-    const { data: companyData, error: companyError } = await supabase
+
+    // Create the company first (unauthenticated). We must avoid `.select()` here,
+    // because anonymous users are not allowed to read companies (RLS), and PostgREST
+    // would need a SELECT to return the inserted row.
+    const companyId = crypto.randomUUID();
+    const { error: companyError } = await supabase
       .from('companies')
-      .insert({ name: companyName })
-      .select()
-      .single();
-    
+      .insert({ id: companyId, name: companyName });
+
     if (companyError) {
       return { error: companyError };
     }
@@ -73,8 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (authError) {
-      // Clean up company if auth failed
-      await supabase.from('companies').delete().eq('id', companyData.id);
+      // Best-effort: the company may remain if signup fails, but we avoid extra failing calls.
       return { error: authError };
     }
 
@@ -82,9 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (authData.user) {
       await supabase
         .from('profiles')
-        .update({ company_id: companyData.id })
+        .update({ company_id: companyId })
         .eq('id', authData.user.id);
-      
+
       await supabase
         .from('user_roles')
         .update({ role: 'owner' })
