@@ -1,7 +1,1 @@
-project_id = "nvoqdzhywbmuloxrtabq"
-
-[functions.crm-ai]
-verify_jwt = true
-
-[functions.deal-prediction]
-verify_jwt = true
+project_id = "hrapjfczbydvcmxrdcwh"
