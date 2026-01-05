@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Plus, MoreHorizontal, Building2, DollarSign, User } from "lucide-react";
+import { Plus, MoreHorizontal, Building2, DollarSign, User, Brain } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useDealPrediction } from "@/hooks/useDealPrediction";
+import { DealPredictionPanel } from "@/components/ai/DealPredictionPanel";
 
 interface Deal {
   id: number;
@@ -169,9 +171,31 @@ const formatCurrency = (value: number) => {
 
 const Pipeline = () => {
   const [stages] = useState<Stage[]>(initialStages);
+  const [showPredictions, setShowPredictions] = useState(false);
+  const { predictions, summary, isLoading, predictDeals, clearPredictions } = useDealPrediction();
 
   const getStageTotal = (deals: Deal[]) => {
     return deals.reduce((sum, deal) => sum + deal.value, 0);
+  };
+
+  // Flatten all deals for prediction
+  const allDeals = useMemo(() => {
+    return stages.flatMap((stage) =>
+      stage.deals.map((deal) => ({
+        ...deal,
+        stage: stage.name,
+      }))
+    );
+  }, [stages]);
+
+  const handlePredict = () => {
+    setShowPredictions(true);
+    predictDeals(allDeals);
+  };
+
+  // Get prediction for a specific deal
+  const getPrediction = (dealId: number) => {
+    return predictions.find((p) => p.dealId === dealId);
   };
 
   return (
@@ -185,11 +209,38 @@ const Pipeline = () => {
               Visualize and manage your deals through every stage.
             </p>
           </div>
-          <Button className="gradient-primary shadow-glow">
-            <Plus className="w-4 h-4 mr-1.5" />
-            Add Deal
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={showPredictions ? "secondary" : "outline"}
+              onClick={() => setShowPredictions(!showPredictions)}
+              className="gap-2"
+            >
+              <Brain className="w-4 h-4" />
+              {showPredictions ? "Masquer IA" : "Prédictions IA"}
+            </Button>
+            <Button className="gradient-primary shadow-glow">
+              <Plus className="w-4 h-4 mr-1.5" />
+              Add Deal
+            </Button>
+          </div>
         </div>
+
+        {/* AI Prediction Panel */}
+        {showPredictions && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-6"
+          >
+            <DealPredictionPanel
+              predictions={predictions}
+              summary={summary}
+              isLoading={isLoading}
+              onPredict={handlePredict}
+            />
+          </motion.div>
+        )}
 
         {/* Pipeline Board */}
         <div className="flex-1 overflow-x-auto">
@@ -269,12 +320,37 @@ const Pipeline = () => {
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className="text-xs px-1.5 py-0 bg-muted/50"
-                          >
-                            {deal.probability}%
-                          </Badge>
+                          {/* Show AI prediction badge if available */}
+                          {(() => {
+                            const pred = getPrediction(deal.id);
+                            if (pred) {
+                              const diff = pred.predictedProbability - deal.probability;
+                              return (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-xs px-1.5 py-0",
+                                    diff > 0
+                                      ? "border-success/50 bg-success/10 text-success"
+                                      : diff < 0
+                                      ? "border-destructive/50 bg-destructive/10 text-destructive"
+                                      : "bg-muted/50"
+                                  )}
+                                >
+                                  <Brain className="w-3 h-3 mr-0.5" />
+                                  {pred.predictedProbability}%
+                                </Badge>
+                              );
+                            }
+                            return (
+                              <Badge
+                                variant="outline"
+                                className="text-xs px-1.5 py-0 bg-muted/50"
+                              >
+                                {deal.probability}%
+                              </Badge>
+                            );
+                          })()}
                           <Avatar className="w-6 h-6">
                             <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
                               {deal.owner.initials}
